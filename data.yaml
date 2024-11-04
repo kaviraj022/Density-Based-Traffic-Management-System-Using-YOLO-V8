@@ -1,0 +1,7 @@
+train: D:\Mini Project\dataset\test\images
+val: D:\Mini Project\dataset\valid\images
+test: D:\Mini Project\dataset\test\images
+
+nc: 5
+names: ['bicycle', 'bus', 'car', 'motorbike', 'person']
+
