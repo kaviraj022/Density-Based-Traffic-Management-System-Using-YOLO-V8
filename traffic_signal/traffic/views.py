@@ -20,7 +20,9 @@ def upload_view(request):
 
 def intersection_view(request):
     files = request.session.get('lane_files', {})
+    current_green = 'north'  # Default green lane
     return render(request, 'traffic/intersection.html', {
         'files': files,
         'lanes': LANES,
+        'current_green': current_green,
     })

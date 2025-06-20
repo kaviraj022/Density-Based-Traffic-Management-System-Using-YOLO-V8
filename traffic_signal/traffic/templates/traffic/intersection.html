@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Traffic Intersection Visualization</title>
+    <style>
+        #intersection { display: flex; flex-wrap: wrap; width: 900px; margin: 30px auto; justify-content: space-between; }
+        .lane { width: 44%; margin: 2%; border: 2px solid #333; padding: 10px; box-sizing: border-box; border-radius: 10px; background: #f9f9f9; }
+        .signal { width: 30px; height: 30px; border-radius: 50%; margin-bottom: 10px; border: 2px solid #222; display: inline-block; background: #bbb; }
+        .lane-title { font-weight: bold; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Traffic Intersection Visualization</h1>
+    <div id="intersection">
+        {% for lane in lanes %}
+        <div class="lane" id="{{ lane }}-lane">
+            <div class="lane-title">{{ lane|title }} Lane</div>
+            <div class="signal"></div>
+            {% if files.lane %}
+                {% if files.lane.endswith ".mp4" %}
+                    <video width="240" controls>
+                        <source src="{{ files.lane }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                {% else %}
+                    <img src="{{ files.lane }}" width="240" />
+                {% endif %}
+            {% else %}
+                <p>No file uploaded for this lane.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <a href="/">Back to Upload</a>
+</body>
+</html> 
