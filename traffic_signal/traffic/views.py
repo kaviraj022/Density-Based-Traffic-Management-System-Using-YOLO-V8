@@ -15,5 +15,12 @@ def upload_view(request):
                 filename = fs.save(uploaded.name, uploaded)
                 files[lane] = fs.url(filename)
         request.session['lane_files'] = files
-        return redirect('upload')  # For now, just reload the page
+        return redirect('intersection')
     return render(request, 'traffic/upload.html')
+
+def intersection_view(request):
+    files = request.session.get('lane_files', {})
+    return render(request, 'traffic/intersection.html', {
+        'files': files,
+        'lanes': LANES,
+    })
