@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Light Control System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .upload-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .upload-item {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .upload-item label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .upload-item input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-item input[type="file"]:hover {
+            border-color: #764ba2;
+            background: #f0f0f0;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .intersection-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .intersection-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .lane-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #1a1a1a;
+            aspect-ratio: 16/9;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .lane-container.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 1.2em;
+        }
+
+        .lane-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .lane-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .traffic-light {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 60px;
+            height: 180px;
+            background: #333;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+        }
+
+        .light {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #555;
+            transition: all 0.3s;
+        }
+
+        .light.red.active {
+            background: #e74c3c;
+            box-shadow: 0 0 20px #e74c3c;
+        }
+
+        .light.yellow.active {
+            background: #f39c12;
+            box-shadow: 0 0 20px #f39c12;
+        }
+
+        .light.green.active {
+            background: #2ecc71;
+            box-shadow: 0 0 20px #2ecc71;
+        }
+
+        .status-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            z-index: 10;
+        }
+
+        /* Plus shape layout - center is empty */
+        .lane-1 { grid-column: 2; grid-row: 1; } /* Top */
+        .lane-2 { grid-column: 3; grid-row: 2; } /* Right */
+        .lane-3 { grid-column: 2; grid-row: 3; } /* Bottom */
+        .lane-4 { grid-column: 1; grid-row: 2; } /* Left */
+        .center { grid-column: 2; grid-row: 2; } /* Center intersection */
+
+        .center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            border-radius: 10px;
+        }
+
+        .status-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .status-panel h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .status-item strong {
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .intersection-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(5, 1fr);
+            }
+
+            .lane-1 { grid-column: 1; grid-row: 1; }
+            .lane-2 { grid-column: 1; grid-row: 2; }
+            .lane-3 { grid-column: 1; grid-row: 3; }
+            .lane-4 { grid-column: 1; grid-row: 4; }
+            .center { grid-column: 1; grid-row: 5; }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚦 Traffic Light Control System</h1>
+            <p>Intelligent 4-Lane Intersection Management</p>
+        </div>
+
+        <div class="upload-section">
+            <h2 style="margin-bottom: 20px; color: #333;">Upload Lane Videos</h2>
+            <div class="upload-grid">
+                <div class="upload-item">
+                    <label for="lane1">Lane 1 (Top)</label>
+                    <input type="file" id="lane1" accept="video/*" onchange="uploadVideo('lane1', this.files[0])">
+                </div>
+                <div class="upload-item">
+                    <label for="lane2">Lane 2 (Right)</label>
+                    <input type="file" id="lane2" accept="video/*" onchange="uploadVideo('lane2', this.files[0])">
+                </div>
+                <div class="upload-item">
+                    <label for="lane3">Lane 3 (Bottom)</label>
+                    <input type="file" id="lane3" accept="video/*" onchange="uploadVideo('lane3', this.files[0])">
+                </div>
+                <div class="upload-item">
+                    <label for="lane4">Lane 4 (Left)</label>
+                    <input type="file" id="lane4" accept="video/*" onchange="uploadVideo('lane4', this.files[0])">
+                </div>
+            </div>
+            <div class="control-buttons">
+                <button class="btn btn-primary" onclick="startSystem()" id="startBtn">Run Project</button>
+                <button class="btn btn-danger" onclick="stopSystem()" id="stopBtn" disabled>Stop</button>
+            </div>
+        </div>
+
+        <div class="intersection-container">
+            <h2 style="margin-bottom: 20px; color: #333; text-align: center;">Intersection View</h2>
+            <div class="intersection-grid">
+                <div class="lane-container lane-1" id="lane1-container">
+                    <div class="lane-overlay">Lane 1</div>
+                    <div class="traffic-light" id="light1">
+                        <div class="light red" id="light1-red"></div>
+                        <div class="light yellow" id="light1-yellow"></div>
+                        <div class="light green" id="light1-green"></div>
+                    </div>
+                    <div class="status-info" id="status1">No video loaded</div>
+                </div>
+                <div class="lane-container lane-2" id="lane2-container">
+                    <div class="lane-overlay">Lane 2</div>
+                    <div class="traffic-light" id="light2">
+                        <div class="light red" id="light2-red"></div>
+                        <div class="light yellow" id="light2-yellow"></div>
+                        <div class="light green" id="light2-green"></div>
+                    </div>
+                    <div class="status-info" id="status2">No video loaded</div>
+                </div>
+                <div class="lane-container lane-3" id="lane3-container">
+                    <div class="lane-overlay">Lane 3</div>
+                    <div class="traffic-light" id="light3">
+                        <div class="light red" id="light3-red"></div>
+                        <div class="light yellow" id="light3-yellow"></div>
+                        <div class="light green" id="light3-green"></div>
+                    </div>
+                    <div class="status-info" id="status3">No video loaded</div>
+                </div>
+                <div class="lane-container lane-4" id="lane4-container">
+                    <div class="lane-overlay">Lane 4</div>
+                    <div class="traffic-light" id="light4">
+                        <div class="light red" id="light4-red"></div>
+                        <div class="light yellow" id="light4-yellow"></div>
+                        <div class="light green" id="light4-green"></div>
+                    </div>
+                    <div class="status-info" id="status4">No video loaded</div>
+                </div>
+                <div class="center">
+                    INTERSECTION
+                </div>
+            </div>
+        </div>
+
+        <div class="status-panel">
+            <h2>System Status</h2>
+            <div class="status-item">
+                <span>Current Active Lane:</span>
+                <strong id="current-lane">None</strong>
+            </div>
+            <div class="status-item">
+                <span>Elapsed Time:</span>
+                <strong id="elapsed-time">0.0s</strong>
+            </div>
+            <div class="status-item">
+                <span>Vehicle Count:</span>
+                <strong id="vehicle-count">0</strong>
+            </div>
+            <div class="status-item">
+                <span>System Status:</span>
+                <strong id="system-status">Stopped</strong>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let updateInterval = null;
+        let frameUpdateIntervals = [];
+
+        function uploadVideo(lane, file) {
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('lane', lane);
+
+            // Show loading state
+            const statusDiv = document.getElementById(`status${lane.replace('lane', '')}`);
+            statusDiv.textContent = 'Uploading...';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    statusDiv.textContent = 'Upload failed';
+                } else {
+                    statusDiv.textContent = 'Video loaded';
+                    updateLaneDisplay(lane);
+                    // Start updating frames for this lane
+                    updateLaneFrame(parseInt(lane.replace('lane', '')));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading video');
+                statusDiv.textContent = 'Upload failed';
+            });
+        }
+
+        function updateLaneDisplay(lane) {
+            const laneNum = lane.replace('lane', '');
+            const container = document.getElementById(`${lane}-container`);
+            const statusDiv = document.getElementById(`status${laneNum}`);
+            
+            // Remove empty class if present
+            container.classList.remove('empty');
+            
+            // Create video element if it doesn't exist
+            let video = container.querySelector('.lane-video');
+            if (!video) {
+                video = document.createElement('img');
+                video.className = 'lane-video';
+                container.appendChild(video);
+            }
+        }
+
+        function updateLaneFrame(lane) {
+            // Clear existing interval for this lane
+            const existingInterval = frameUpdateIntervals[lane - 1];
+            if (existingInterval) {
+                clearInterval(existingInterval);
+            }
+
+            // Update frame every 100ms (10 FPS) for smoother playback
+            const interval = setInterval(() => {
+                fetch(`/frame/${lane}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            // Video not loaded yet, show placeholder
+                            const container = document.getElementById(`lane${lane}-container`);
+                            const statusDiv = document.getElementById(`status${lane}`);
+                            statusDiv.textContent = 'No video loaded';
+                            return;
+                        }
+                        
+                        if (data.frame) {
+                            const container = document.getElementById(`lane${lane}-container`);
+                            let img = container.querySelector('.lane-video');
+                            if (!img) {
+                                img = document.createElement('img');
+                                img.className = 'lane-video';
+                                container.appendChild(img);
+                            }
+                            img.src = data.frame;
+                            
+                            const statusDiv = document.getElementById(`status${lane}`);
+                            statusDiv.textContent = `Vehicles: ${data.vehicle_count}`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error updating frame for lane ${lane}:`, error);
+                    });
+            }, 200);
+
+            frameUpdateIntervals[lane - 1] = interval;
+        }
+
+        function startSystem() {
+            fetch('/start', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert('Traffic light system started!');
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    
+                    // Start updating all lane frames
+                    for (let i = 1; i <= 4; i++) {
+                        updateLaneFrame(i);
+                    }
+                    
+                    // Start status updates
+                    if (updateInterval) clearInterval(updateInterval);
+                    updateInterval = setInterval(updateStatus, 500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error starting system');
+            });
+        }
+
+        function stopSystem() {
+            fetch('/stop', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                
+                // Clear all intervals
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                }
+                
+                frameUpdateIntervals.forEach(interval => {
+                    if (interval) clearInterval(interval);
+                });
+                frameUpdateIntervals = [];
+                
+                // Reset all traffic lights to red
+                for (let i = 1; i <= 4; i++) {
+                    updateTrafficLight(i, 'red');
+                }
+                
+                updateStatus();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current-lane').textContent = 
+                        data.current_lane ? `Lane ${data.current_lane}` : 'None';
+                    document.getElementById('elapsed-time').textContent = 
+                        `${data.elapsed_time}s / ${30}s`;
+                    document.getElementById('vehicle-count').textContent = data.vehicle_count;
+                    document.getElementById('system-status').textContent = 
+                        data.is_running ? 'Running' : (data.cycle_complete ? 'Cycle Complete' : 'Stopped');
+                    
+                    // Update traffic lights
+                    for (let i = 1; i <= 4; i++) {
+                        if (data.current_lane === i && data.is_running) {
+                            updateTrafficLight(i, 'green');
+                        } else {
+                            updateTrafficLight(i, 'red');
+                        }
+                    }
+                    
+                    // If cycle complete, stop the system
+                    if (data.cycle_complete) {
+                        stopSystem();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating status:', error);
+                });
+        }
+
+        function updateTrafficLight(lane, color) {
+            const red = document.getElementById(`light${lane}-red`);
+            const yellow = document.getElementById(`light${lane}-yellow`);
+            const green = document.getElementById(`light${lane}-green`);
+            
+            // Remove all active classes
+            red.classList.remove('active');
+            yellow.classList.remove('active');
+            green.classList.remove('active');
+            
+            // Add active class to the appropriate light
+            if (color === 'red') {
+                red.classList.add('active');
+            } else if (color === 'yellow') {
+                yellow.classList.add('active');
+            } else if (color === 'green') {
+                green.classList.add('active');
+            }
+        }
+
+        // Initialize - update status every 2 seconds when not running
+        setInterval(() => {
+            if (!updateInterval) {
+                updateStatus();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
+
