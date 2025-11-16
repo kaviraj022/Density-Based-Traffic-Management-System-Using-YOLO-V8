@@ -8,6 +8,8 @@ import threading
 import base64
 import numpy as np
 import copy
+import json
+import requests
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -21,6 +23,30 @@ VEHICLE_CLASS_IDS = [0, 1, 2, 3]  # 'bicycle', 'bus', 'car', 'motorbike'
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Load ESP32 configuration
+ESP32_CONFIG_FILE = 'esp32_config.json'
+esp32_config = {
+    'esp32_ip': '192.168.1.100',
+    'esp32_port': 80,
+    'enabled': True,
+    'timeout': 2
+}
+
+def load_esp32_config():
+    """Load ESP32 configuration from JSON file"""
+    global esp32_config
+    if os.path.exists(ESP32_CONFIG_FILE):
+        try:
+            with open(ESP32_CONFIG_FILE, 'r') as f:
+                esp32_config = json.load(f)
+                print(f"ESP32 config loaded: {esp32_config}")
+        except Exception as e:
+            print(f"Error loading ESP32 config: {e}. Using defaults.")
+    else:
+        print(f"ESP32 config file not found. Using defaults. Create {ESP32_CONFIG_FILE} to configure.")
+
+load_esp32_config()
 
 # Load the YOLO model lazily
 model = None
@@ -107,6 +133,53 @@ def get_frame_from_video(cap):
         ret, frame = cap.read()
     return ret, frame
 
+def send_esp32_command(lane, state):
+    """
+    Send LED control command to ESP32
+    Args:
+        lane: Lane number (1-4)
+        state: 'GREEN' or 'RED'
+    """
+    if not esp32_config.get('enabled', True):
+        return
+    
+    try:
+        ip = esp32_config.get('esp32_ip', '192.168.1.100')
+        port = esp32_config.get('esp32_port', 80)
+        timeout = esp32_config.get('timeout', 2)
+        
+        url = f"http://{ip}:{port}/control"
+        params = {'lane': lane, 'state': state}
+        
+        response = requests.get(url, params=params, timeout=timeout)
+        if response.status_code == 200:
+            print(f"ESP32: Lane {lane} set to {state}")
+        else:
+            print(f"ESP32: Failed to set lane {lane} to {state}. Status: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"ESP32: Connection error - {e}")
+    except Exception as e:
+        print(f"ESP32: Error sending command - {e}")
+
+def update_all_esp32_lights(current_lane, is_running):
+    """
+    Update all ESP32 LED lights based on current lane
+    Args:
+        current_lane: Current active lane (1-4, or 0 if none)
+        is_running: Whether system is running
+    """
+    if not is_running:
+        # All lanes RED when stopped
+        for lane in range(1, 5):
+            send_esp32_command(lane, 'RED')
+    else:
+        # Set active lane to GREEN, others to RED
+        for lane in range(1, 5):
+            if lane == current_lane:
+                send_esp32_command(lane, 'GREEN')
+            else:
+                send_esp32_command(lane, 'RED')
+
 def process_traffic_light_logic():
     """Main traffic light logic - runs in background thread"""
     global traffic_state
@@ -118,6 +191,8 @@ def process_traffic_light_logic():
         if current_lane >= 4:
             traffic_state['cycle_complete'] = True
             traffic_state['is_running'] = False
+            # Set all ESP32 LEDs to RED when cycle completes
+            update_all_esp32_lights(0, False)
             break
         
         # Initialize lane start time
@@ -125,6 +200,8 @@ def process_traffic_light_logic():
             print(f"Starting lane {current_lane + 1}")
             traffic_state['lane_start_time'] = time.time()
             traffic_state['last_vehicle_check_time'] = time.time()
+            # Update ESP32 LEDs
+            update_all_esp32_lights(current_lane + 1, True)
             # Reset video to beginning when starting a new lane
             cap = traffic_state['lane_caps'][current_lane]
             if cap is not None:
@@ -160,6 +237,9 @@ def process_traffic_light_logic():
             print(f"Lane {current_lane + 1} reached max time ({MAX_GREEN_TIME}s), switching to lane {current_lane + 2}")
             traffic_state['current_lane'] += 1
             traffic_state['lane_start_time'] = None
+            # Update ESP32 LEDs for new lane
+            if traffic_state['current_lane'] < 4:
+                update_all_esp32_lights(traffic_state['current_lane'] + 1, True)
             time.sleep(1)  # Brief pause between lane switches
             continue
         
@@ -195,6 +275,9 @@ def process_traffic_light_logic():
                     print(f"Lane {current_lane + 1} has no vehicles after {elapsed_time:.1f}s, switching to lane {current_lane + 2}")
                     traffic_state['current_lane'] += 1
                     traffic_state['lane_start_time'] = None
+                    # Update ESP32 LEDs for new lane
+                    if traffic_state['current_lane'] < 4:
+                        update_all_esp32_lights(traffic_state['current_lane'] + 1, True)
                     time.sleep(1)  # Brief pause between lane switches
                     continue
         else:
@@ -277,6 +360,9 @@ def start_system():
             traffic_state['lane_vehicle_counts'][i] = 0
             traffic_state['lane_last_detection_time'][i] = 0
     
+    # Initialize ESP32 LEDs (all RED first, will be updated by logic thread)
+    update_all_esp32_lights(0, False)
+    
     # Start traffic light logic in background thread
     thread = threading.Thread(target=process_traffic_light_logic, daemon=True)
     thread.start()
@@ -288,6 +374,8 @@ def stop_system():
     """Stop the traffic light system"""
     global traffic_state
     traffic_state['is_running'] = False
+    # Set all ESP32 LEDs to RED
+    update_all_esp32_lights(0, False)
     return jsonify({'message': 'Traffic light system stopped'})
 
 @app.route('/status', methods=['GET'])
