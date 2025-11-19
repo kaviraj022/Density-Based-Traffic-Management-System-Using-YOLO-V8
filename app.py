@@ -146,7 +146,7 @@ def send_esp32_command(lane, state):
     try:
         ip = esp32_config.get('esp32_ip', '192.168.1.100')
         port = esp32_config.get('esp32_port', 80)
-        timeout = esp32_config.get('timeout', 2)
+        timeout = esp32_config.get('timeout', 1)  # Reduced timeout for faster switching
         
         url = f"http://{ip}:{port}/control"
         params = {'lane': lane, 'state': state}
@@ -164,36 +164,54 @@ def send_esp32_command(lane, state):
 def update_all_esp32_lights(current_lane, is_running):
     """
     Update all ESP32 LED lights based on current lane
+    Uses threading to send all commands in parallel for faster switching
     Args:
         current_lane: Current active lane (1-4, or 0 if none)
         is_running: Whether system is running
     """
+    if not esp32_config.get('enabled', True):
+        return
+    
+    def send_command_thread(lane, state):
+        """Helper function to send command in a thread"""
+        send_esp32_command(lane, state)
+    
+    threads = []
     if not is_running:
-        # All lanes RED when stopped
+        # All lanes RED when stopped - send all commands in parallel
         for lane in range(1, 5):
-            send_esp32_command(lane, 'RED')
+            thread = threading.Thread(target=send_command_thread, args=(lane, 'RED'), daemon=True)
+            thread.start()
+            threads.append(thread)
     else:
-        # Set active lane to GREEN, others to RED
+        # Set active lane to GREEN, others to RED - send all commands in parallel
         for lane in range(1, 5):
-            if lane == current_lane:
-                send_esp32_command(lane, 'GREEN')
-            else:
-                send_esp32_command(lane, 'RED')
+            state = 'GREEN' if lane == current_lane else 'RED'
+            thread = threading.Thread(target=send_command_thread, args=(lane, state), daemon=True)
+            thread.start()
+            threads.append(thread)
+    
+    # Wait for all threads to complete (with a max wait time)
+    for thread in threads:
+        thread.join(timeout=0.5)  # Don't wait too long, allow parallel execution
 
 def process_traffic_light_logic():
     """Main traffic light logic - runs in background thread"""
     global traffic_state
     
-    while traffic_state['is_running'] and not traffic_state['cycle_complete']:
+    while traffic_state['is_running']:
         current_lane = traffic_state['current_lane']
         
-        # Check if we've completed all lanes
+        # Loop back to lane 1 (index 0) after completing lane 4 (index 3)
+        # Instead of stopping, we continue the cycle
         if current_lane >= 4:
-            traffic_state['cycle_complete'] = True
-            traffic_state['is_running'] = False
-            # Set all ESP32 LEDs to RED when cycle completes
-            update_all_esp32_lights(0, False)
-            break
+            print("Completed all lanes, looping back to lane 1")
+            traffic_state['current_lane'] = 0
+            current_lane = 0
+            traffic_state['lane_start_time'] = None
+            # Brief pause before restarting cycle
+            time.sleep(0.5)
+            continue
         
         # Initialize lane start time
         if traffic_state['lane_start_time'] is None:
@@ -221,9 +239,10 @@ def process_traffic_light_logic():
         # Get video capture for current lane
         cap = traffic_state['lane_caps'][current_lane]
         if cap is None:
-            # No video for this lane, skip to next
-            print(f"No video for lane {current_lane + 1}, skipping to next lane")
-            traffic_state['current_lane'] += 1
+            # No video for this lane, skip to next (loop back to 0 after lane 4)
+            next_lane = (current_lane + 1) % 4  # Loop back to 0 after 3
+            print(f"No video for lane {current_lane + 1}, skipping to next lane {next_lane + 1}")
+            traffic_state['current_lane'] = next_lane
             traffic_state['lane_start_time'] = None
             time.sleep(0.5)
             continue
@@ -233,14 +252,14 @@ def process_traffic_light_logic():
         
         # Check if maximum time elapsed
         if elapsed_time >= MAX_GREEN_TIME:
-            # Switch to next lane
-            print(f"Lane {current_lane + 1} reached max time ({MAX_GREEN_TIME}s), switching to lane {current_lane + 2}")
-            traffic_state['current_lane'] += 1
+            # Switch to next lane (will loop back to 0 after lane 4)
+            next_lane = (current_lane + 1) % 4  # Loop back to 0 after 3
+            print(f"Lane {current_lane + 1} reached max time ({MAX_GREEN_TIME}s), switching to lane {next_lane + 1}")
+            traffic_state['current_lane'] = next_lane
             traffic_state['lane_start_time'] = None
             # Update ESP32 LEDs for new lane
-            if traffic_state['current_lane'] < 4:
-                update_all_esp32_lights(traffic_state['current_lane'] + 1, True)
-            time.sleep(1)  # Brief pause between lane switches
+            update_all_esp32_lights(next_lane + 1, True)
+            time.sleep(0.5)  # Brief pause between lane switches
             continue
         
         # Advance video for active lane only (play at normal speed)
@@ -271,19 +290,20 @@ def process_traffic_light_logic():
                 
                 # Switch lane if no vehicles detected (but only after checking for at least 2 seconds)
                 if vehicle_count == 0 and elapsed_time >= 2.0:
-                    # Switch to next lane
-                    print(f"Lane {current_lane + 1} has no vehicles after {elapsed_time:.1f}s, switching to lane {current_lane + 2}")
-                    traffic_state['current_lane'] += 1
+                    # Switch to next lane (will loop back to 0 after lane 4)
+                    next_lane = (current_lane + 1) % 4  # Loop back to 0 after 3
+                    print(f"Lane {current_lane + 1} has no vehicles after {elapsed_time:.1f}s, switching to lane {next_lane + 1}")
+                    traffic_state['current_lane'] = next_lane
                     traffic_state['lane_start_time'] = None
                     # Update ESP32 LEDs for new lane
-                    if traffic_state['current_lane'] < 4:
-                        update_all_esp32_lights(traffic_state['current_lane'] + 1, True)
-                    time.sleep(1)  # Brief pause between lane switches
+                    update_all_esp32_lights(next_lane + 1, True)
+                    time.sleep(0.5)  # Brief pause between lane switches
                     continue
         else:
-            # Could not read frame, skip to next lane
-            print(f"Could not read frame from lane {current_lane + 1}, switching to next lane")
-            traffic_state['current_lane'] += 1
+            # Could not read frame, skip to next lane (loop back to 0 after lane 4)
+            next_lane = (current_lane + 1) % 4  # Loop back to 0 after 3
+            print(f"Could not read frame from lane {current_lane + 1}, switching to next lane {next_lane + 1}")
+            traffic_state['current_lane'] = next_lane
             traffic_state['lane_start_time'] = None
             time.sleep(0.5)
             continue
@@ -349,7 +369,7 @@ def start_system():
     traffic_state['current_lane'] = 0  # Start with lane 1 (index 0)
     traffic_state['lane_start_time'] = None
     traffic_state['is_running'] = True
-    traffic_state['cycle_complete'] = False
+    traffic_state['cycle_complete'] = False  # Keep for backward compatibility, but won't stop cycling
     traffic_state['last_vehicle_check_time'] = None
     
     # Reset all video captures to beginning
@@ -360,12 +380,16 @@ def start_system():
             traffic_state['lane_vehicle_counts'][i] = 0
             traffic_state['lane_last_detection_time'][i] = 0
     
-    # Initialize ESP32 LEDs (all RED first, will be updated by logic thread)
-    update_all_esp32_lights(0, False)
-    
     # Start traffic light logic in background thread
     thread = threading.Thread(target=process_traffic_light_logic, daemon=True)
     thread.start()
+    
+    # Immediately set lane 1 to GREEN (current_lane is 0, so lane 1)
+    # Give thread a tiny moment to initialize, then set the lights
+    time.sleep(0.1)
+    print("Setting lane 1 to GREEN on startup...")
+    update_all_esp32_lights(1, True)  # Lane 1 (index 0 + 1)
+    print("Lane 1 should now be GREEN")
     
     return jsonify({'message': 'Traffic light system started'})
 
