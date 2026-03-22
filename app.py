@@ -27,7 +27,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Load ESP32 configuration
 ESP32_CONFIG_FILE = 'esp32_config.json'
 esp32_config = {
-    'esp32_ip': '192.168.1.100',
+    'esp32_ip': '10.211.90.176',
     'esp32_port': 80,
     'enabled': True,
     'timeout': 2

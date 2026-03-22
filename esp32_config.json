@@ -1,5 +1,5 @@
 {
-  "esp32_ip": "10.59.68.176",
+  "esp32_ip": "10.211.90.176",
   "esp32_port": 80,
   "enabled": true,
   "timeout": 2

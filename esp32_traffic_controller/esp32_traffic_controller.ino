@@ -3,10 +3,10 @@
  * Receives HTTP commands from Flask server to control 8 LEDs (4 lanes, each with Red and Green)
  * 
  * Wiring:
- * Lane A: Red=GPIO13, Green=GPIO14
- * Lane B: Red=GPIO27, Green=GPIO26
- * Lane C: Red=GPIO25, Green=GPIO18
- * Lane D: Red=GPIO19, Green=GPIO21
+ * Lane A: Red=GPIO23, Green=GPIO14
+ * Lane B: Red=GPIO25, Green=GPIO26
+ * Lane C: Red=GPIO27, Green=GPIO32
+ * Lane D: Red=GPIO18, Green=GPIO19
  * All LED negatives (-) → GND
  */
 
@@ -21,14 +21,14 @@ const char* password = "YOUR_WIFI_PASSWORD";
 WebServer server(80);
 
 // LED Pin Definitions
-const int LANE_A_RED = 13;
+const int LANE_A_RED = 23;
 const int LANE_A_GREEN = 14;
-const int LANE_B_RED = 27;
+const int LANE_B_RED = 25;
 const int LANE_B_GREEN = 26;
-const int LANE_C_RED = 25;
-const int LANE_C_GREEN = 18;
-const int LANE_D_RED = 19;
-const int LANE_D_GREEN = 21;
+const int LANE_C_RED = 27;
+const int LANE_C_GREEN = 32;
+const int LANE_D_RED = 18;
+const int LANE_D_GREEN = 19;
 
 // Current state of each lane (0=RED, 1=GREEN)
 int lane_states[4] = {0, 0, 0, 0};
