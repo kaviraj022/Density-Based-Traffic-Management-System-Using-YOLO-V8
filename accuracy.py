@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv("runs/detect/train/results.csv")
+df = pd.read_csv("runs/detect/yolo26s_train/results.csv")
 
 best_epoch = df["metrics/mAP50(B)"].idxmax()
 print("Best Epoch:", df.loc[best_epoch, "epoch"])
