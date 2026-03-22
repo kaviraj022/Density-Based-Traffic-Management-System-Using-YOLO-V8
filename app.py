@@ -56,7 +56,7 @@ def get_model():
     global model
     if model is None:
         import torch
-        model_path = 'runs/detect/train/weights/best.pt'
+        model_path = 'runs/detect/yolo26s_train/weights/best.pt'
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}. Please train the model first.")
         
