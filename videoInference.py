@@ -10,7 +10,7 @@ import os
 import copy
 
 # Load the YOLO model
-model = YOLO('runs/detect/train/weights/best.pt')
+model = YOLO('runs/detect/yolo26s_train/weights/best.pt')
 
 # Define vehicle class IDs based on your data.yaml file
 VEHICLE_CLASS_IDS = [0, 1, 2, 3]  # 'bicycle', 'bus', 'car', 'motorbike'
